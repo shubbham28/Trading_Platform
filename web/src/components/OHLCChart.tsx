@@ -50,7 +50,7 @@ const OHLCChart: React.FC<OHLCChartProps> = ({ symbol, bars, height = 400 }) => 
 
     // Transform and set data
     const chartData = bars.map(bar => ({
-      time: new Date(bar.t).getTime() / 1000,
+      time: Math.floor(new Date(bar.t).getTime() / 1000) as any,
       open: bar.o,
       high: bar.h,
       low: bar.l,

@@ -60,7 +60,14 @@ class AlpacaClient {
 
       const result: Bar[] = [];
       for await (const bar of bars) {
-        result.push(bar as Bar);
+        result.push({
+          t: (bar as any).Timestamp || (bar as any).t,
+          o: (bar as any).OpenPrice || (bar as any).o,
+          h: (bar as any).HighPrice || (bar as any).h,
+          l: (bar as any).LowPrice || (bar as any).l,
+          c: (bar as any).ClosePrice || (bar as any).c,
+          v: (bar as any).Volume || (bar as any).v,
+        });
       }
       return result;
     } catch (error) {
@@ -72,7 +79,14 @@ class AlpacaClient {
   async getLatestBar(symbol: string): Promise<Bar> {
     try {
       const bar = await this.client.getLatestBar(symbol);
-      return bar as Bar;
+      return {
+        t: (bar as any).Timestamp || (bar as any).t,
+        o: (bar as any).OpenPrice || (bar as any).o,
+        h: (bar as any).HighPrice || (bar as any).h,
+        l: (bar as any).LowPrice || (bar as any).l,
+        c: (bar as any).ClosePrice || (bar as any).c,
+        v: (bar as any).Volume || (bar as any).v,
+      };
     } catch (error) {
       console.error(`Error fetching latest bar for ${symbol}:`, error);
       throw error;
@@ -157,7 +171,7 @@ class AlpacaClient {
       const orders = await this.client.getOrders({
         status: status || 'all',
         limit: limit || 100,
-      });
+      } as any);
       return orders as Order[];
     } catch (error) {
       console.error('Error fetching orders:', error);
