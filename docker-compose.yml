@@ -25,6 +25,20 @@ services:
     networks:
       - trading-network
 
+  python-backend:
+    build:
+      context: ./python_backend
+      dockerfile: Dockerfile
+    container_name: trading-platform-python
+    environment:
+      - TRADING_MODE=paper
+    ports:
+      - "8000:8000"
+    networks:
+      - trading-network
+    env_file:
+      - ./python_backend/.env
+
   server:
     build:
       context: ./server
@@ -40,11 +54,13 @@ services:
       - DB_PASSWORD=postgres
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - PYTHON_BACKEND_URL=http://python-backend:8000
     ports:
       - "3001:3001"
     depends_on:
       - postgres
       - redis
+      - python-backend
     networks:
       - trading-network
     env_file:
