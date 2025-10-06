@@ -10,11 +10,17 @@
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["trading", "alpaca", "stocks", "crypto"],
+  "keywords": [
+    "trading",
+    "alpaca",
+    "stocks",
+    "crypto"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@alpacahq/alpaca-trade-api": "^3.0.4",
+    "axios": "^1.12.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

@@ -18,6 +18,7 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 
 ### Backend
 - **Node.js** + Express (TypeScript)
+- **Python** + FastAPI (Advanced strategies & backtesting)
 - **Alpaca API** integration (REST + WebSocket)
 - PostgreSQL for strategies and backtests
 - Redis for caching (optional)
@@ -38,12 +39,16 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 
 ### 3. Strategy Engine
 - ✅ Implement basic algorithms (SMA crossover, RSI)
+- ✅ Advanced Python-based strategies with technical indicators
+- ✅ Support for SMA, EMA, RSI, MACD, Bollinger Bands, VWAP, ATR, Stochastic
 - ✅ Unified `Strategy` interface for live and backtest modes
 - ✅ Extensible strategy system
 
 ### 4. Backtesting
 - ✅ Run strategies on historical data
-- ✅ Simulate trades and compute metrics (return %, Sharpe, drawdown)
+- ✅ Advanced Python backtesting engine with comprehensive metrics
+- ✅ Sharpe ratio, Sortino ratio, max drawdown, profit factor
+- ✅ Simulate trades and compute metrics (return %, win rate, avg win/loss)
 - ✅ Visualize results with equity curve and trade logs
 
 ## 📁 Project Structure
@@ -61,6 +66,17 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── .env.example
+│
+├── python_backend/         # Python Backend (FastAPI)
+│   ├── app/
+│   │   ├── backtest.py    # Advanced backtesting engine
+│   │   └── data_fetcher.py # Alpaca data integration
+│   ├── indicators/        # Technical indicator library
+│   ├── strategies/        # Python-based trading strategies
+│   ├── main.py           # FastAPI application
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── README.md
 │
 ├── web/                    # Frontend (React + Vite)
 │   ├── src/
@@ -83,6 +99,7 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 ### Prerequisites
 
 - Node.js 20+ and npm
+- Python 3.11+ and pip
 - Docker and Docker Compose (optional)
 - Alpaca API account (free paper trading account)
 
@@ -111,24 +128,59 @@ ALPACA_API_KEY=your_paper_api_key_here
 ALPACA_API_SECRET=your_paper_api_secret_here
 ALPACA_BASE_URL=https://paper-api.alpaca.markets
 TRADING_MODE=paper
+PYTHON_BACKEND_URL=http://localhost:8000
 ```
 
-### 3. Setup Frontend
+### 3. Setup Python Backend
+
+```bash
+cd python_backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env and add your Alpaca credentials
+nano .env
+```
+
+Update `.env` with your Alpaca credentials:
+```env
+ALPACA_API_KEY=your_paper_api_key_here
+ALPACA_API_SECRET=your_paper_api_secret_here
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+TRADING_MODE=paper
+```
+
+### 4. Setup Frontend
 
 ```bash
 cd web
 npm install
 ```
 
-### 4. Run Development Servers
+### 5. Run Development Servers
 
-**Terminal 1 - Backend:**
+**Terminal 1 - Node.js Backend:**
 ```bash
 cd server
 npm run dev
 ```
 
-**Terminal 2 - Frontend:**
+**Terminal 2 - Python Backend:**
+```bash
+cd python_backend
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+uvicorn main:app --reload --port 8000
+```
+
+**Terminal 3 - Frontend:**
 ```bash
 cd web
 npm run dev
@@ -150,10 +202,13 @@ docker-compose up -d
 This will start:
 - PostgreSQL database (port 5432)
 - Redis cache (port 6379)
-- Backend server (port 3001)
+- Python backend (port 8000)
+- Node.js backend server (port 3001)
 - Frontend web app (port 5173)
 
 ## 🧩 API Endpoints
+
+### Node.js Backend
 
 | Route | Method | Purpose |
 |-------|--------|---------|
@@ -168,6 +223,17 @@ This will start:
 | `/api/strategies` | GET | List available strategies |
 | `/api/backtest` | POST | Run backtests |
 
+### Python Backend (via `/api/python/*`)
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/python/indicators` | GET | List available indicators |
+| `/api/python/indicators/calculate` | POST | Calculate indicators for symbol |
+| `/api/python/strategies` | GET | List Python strategies |
+| `/api/python/strategies/:id` | GET | Get strategy details |
+| `/api/python/strategies/run` | POST | Execute strategy |
+| `/api/python/backtest` | POST | Run advanced backtest |
+
 ## 📊 UI Components
 
 - **TickerList** – Searchable list of assets (stocks/crypto)
@@ -179,20 +245,62 @@ This will start:
 
 ## 🧠 Available Strategies
 
-### 1. SMA Crossover
+### Node.js Strategies
+
+#### 1. SMA Crossover
 Buy when short-period SMA crosses above long-period SMA, sell when it crosses below.
 
 **Parameters:**
 - `shortPeriod` (default: 10)
 - `longPeriod` (default: 30)
 
-### 2. RSI Strategy
+#### 2. RSI Strategy
 Buy when RSI crosses above oversold level, sell when it crosses below overbought level.
 
 **Parameters:**
 - `period` (default: 14)
 - `oversoldLevel` (default: 30)
 - `overboughtLevel` (default: 70)
+
+### Python Advanced Strategies
+
+#### 1. SMA Crossover (`sma_crossover`)
+Simple Moving Average crossover with configurable periods.
+
+**Parameters:**
+- `short_period` (default: 10)
+- `long_period` (default: 30)
+
+#### 2. RSI Mean Reversion (`rsi_mean_revert`)
+Mean reversion strategy based on RSI oversold/overbought levels.
+
+**Parameters:**
+- `period` (default: 14)
+- `oversold` (default: 30)
+- `overbought` (default: 70)
+
+#### 3. MACD Trend Following (`macd_trend_follow`)
+Trend following strategy using MACD crossovers.
+
+**Parameters:**
+- `fast_period` (default: 12)
+- `slow_period` (default: 26)
+- `signal_period` (default: 9)
+
+## 📊 Technical Indicators (Python Backend)
+
+The Python backend provides comprehensive technical indicators:
+
+- **SMA** - Simple Moving Average
+- **EMA** - Exponential Moving Average
+- **RSI** - Relative Strength Index
+- **MACD** - Moving Average Convergence Divergence
+- **Bollinger Bands** - Volatility bands
+- **VWAP** - Volume Weighted Average Price
+- **ATR** - Average True Range
+- **Stochastic** - Stochastic Oscillator
+
+All indicators are modular and can be combined to create custom strategies.
 
 ## 🔒 Security Notes
 

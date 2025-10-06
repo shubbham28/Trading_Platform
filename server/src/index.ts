@@ -7,6 +7,7 @@ import accountRouter from './routes/account';
 import ordersRouter from './routes/orders';
 import strategiesRouter from './routes/strategies';
 import backtestRouter from './routes/backtest';
+import pythonBackendRouter from './routes/python-backend';
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/account', accountRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/strategies', strategiesRouter);
 app.use('/api/backtest', backtestRouter);
+app.use('/api/python', pythonBackendRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

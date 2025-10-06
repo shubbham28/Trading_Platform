@@ -232,11 +232,100 @@ Both frontend and backend successfully compile without errors:
 ## 📚 Technologies Used
 
 - **Backend:** Node.js, Express, TypeScript, Alpaca API
+- **Python Backend:** FastAPI, Pandas, NumPy, Alpaca-py, Pydantic
 - **Frontend:** React, Vite, TypeScript, Material UI, React Query
 - **Charts:** Lightweight Charts
 - **Database:** PostgreSQL
 - **Cache:** Redis
 - **Container:** Docker, Docker Compose
 - **Build:** TypeScript Compiler, Vite
+
+## 🐍 Python Backend Enhancement (New)
+
+### Overview
+Added a comprehensive Python backend service for advanced technical analysis, strategy execution, and backtesting.
+
+**Location:** `/python_backend`
+
+### Core Components:
+
+#### 1. Technical Indicators Library (`indicators/`)
+- **technical.py** - Comprehensive indicator calculations:
+  - Simple Moving Average (SMA)
+  - Exponential Moving Average (EMA)
+  - Relative Strength Index (RSI)
+  - MACD (Moving Average Convergence Divergence)
+  - Bollinger Bands
+  - VWAP (Volume Weighted Average Price)
+  - ATR (Average True Range)
+  - Stochastic Oscillator
+  - Helper function to calculate all indicators at once
+
+#### 2. Strategy Engine (`strategies/`)
+- **base.py** - Abstract base class for all strategies
+  - Signal generation interface
+  - Trade tracking
+  - Parameter validation
+- **sma_crossover.py** - SMA crossover strategy implementation
+- **rsi_mean_revert.py** - RSI mean reversion strategy
+- **macd_trend_follow.py** - MACD trend following strategy
+- **__init__.py** - Strategy registry and factory pattern
+
+#### 3. Backtesting Engine (`app/backtest.py`)
+Advanced backtesting system with:
+- Trade simulation with commission support
+- Comprehensive performance metrics:
+  - Total return ($ and %)
+  - Sharpe ratio
+  - Sortino ratio
+  - Maximum drawdown
+  - Win rate, profit factor
+  - Average win/loss
+- Equity curve tracking
+- Full trade history
+
+#### 4. Data Integration (`app/data_fetcher.py`)
+- Alpaca API integration for historical data
+- Multiple timeframe support (1Min, 5Min, 1Hour, 1Day, etc.)
+- Data conversion to pandas DataFrames
+
+#### 5. FastAPI Application (`main.py`)
+RESTful API with endpoints:
+- `GET /` - Health check and info
+- `GET /indicators` - List available indicators
+- `POST /indicators/calculate` - Calculate indicators for symbol
+- `GET /strategy/list` - List all strategies
+- `GET /strategy/{id}` - Get strategy details
+- `POST /strategy/run` - Execute strategy and get signals
+- `POST /backtest/run` - Run comprehensive backtest
+
+#### 6. Integration with Node.js Backend
+- **New Route:** `src/routes/python-backend.ts` - Proxy to Python backend
+- Added `/api/python/*` endpoints in Node.js server
+- Seamless integration between Node and Python services
+
+### Configuration Files:
+- **requirements.txt** - Python dependencies
+- **Dockerfile** - Container configuration
+- **.env.example** - Environment variables template
+- **README.md** - Comprehensive documentation
+- **QUICKSTART.md** - Quick start guide
+- **example_usage.py** - Working examples and demos
+
+### Docker Integration:
+Updated `docker-compose.yml` to include Python backend service:
+- Service name: `python-backend`
+- Port: 8000
+- Depends on: None (standalone)
+- Connected to: trading-network
+
+### Key Features:
+✅ Modular and extensible strategy system
+✅ Advanced backtesting with 10+ performance metrics
+✅ 8 technical indicators with more easily added
+✅ RESTful API with automatic documentation
+✅ Integration with existing Node.js backend
+✅ Full Docker support
+✅ Example scripts and comprehensive docs
 
 This is a complete, production-ready MVP that can be extended with additional features!
