@@ -43,6 +43,12 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 - ✅ Support for SMA, EMA, RSI, MACD, Bollinger Bands, VWAP, ATR, Stochastic
 - ✅ Unified `Strategy` interface for live and backtest modes
 - ✅ Extensible strategy system
+- ✅ **NEW: 5 Intraday Trading Strategies**
+  - Morning Momentum - Gap up with volume confirmation
+  - Opening Range Breakout - Trade 30-min range breaks
+  - VWAP Mean Reversion - Trade deviations from VWAP
+  - Mean Reversion Intraday - RSI oversold bounces
+  - Sector Momentum - Ride leading sector trends
 
 ### 4. Backtesting
 - ✅ Run strategies on historical data
@@ -50,6 +56,16 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 - ✅ Sharpe ratio, Sortino ratio, max drawdown, profit factor
 - ✅ Simulate trades and compute metrics (return %, win rate, avg win/loss)
 - ✅ Visualize results with equity curve and trade logs
+- ✅ Support for multiple timeframes (1Min, 5Min, 15Min, 1Hour, 1Day)
+
+### 5. News-Based Forward Testing
+- ✅ **NEW: Sentiment analysis on news headlines**
+  - FinBERT model for financial sentiment
+  - Generate trading signals from news
+  - Combine sentiment with volume metrics
+- ✅ Forward test simulation for upcoming sessions
+- ✅ Track cumulative performance
+- ✅ REST API endpoints for signal generation and retrieval
 
 ## 📁 Project Structure
 
@@ -73,10 +89,18 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 │   │   └── data_fetcher.py # Alpaca data integration
 │   ├── indicators/        # Technical indicator library
 │   ├── strategies/        # Python-based trading strategies
+│   │   ├── morning_momentum.py
+│   │   ├── opening_range_breakout.py
+│   │   ├── vwap_reversion.py
+│   │   ├── mean_reversion_intraday.py
+│   │   └── sector_momentum.py
+│   ├── news_forward_tester.py # News sentiment & forward testing
+│   ├── strategy_demo.ipynb    # Interactive examples
 │   ├── main.py           # FastAPI application
 │   ├── requirements.txt
 │   ├── Dockerfile
-│   └── README.md
+│   ├── README.md
+│   └── INTRADAY_STRATEGIES.md  # Strategy documentation
 │
 ├── web/                    # Frontend (React + Vite)
 │   ├── src/
@@ -91,6 +115,8 @@ A full-stack personal trading platform that connects to the **Alpaca API** to tr
 │   └── vite.config.ts
 │
 ├── docker-compose.yml      # Docker orchestration
+├── ARCHITECTURE.md         # System architecture documentation
+├── IMPLEMENTATION_SUMMARY.md  # Feature implementation details
 └── README.md
 ```
 
@@ -233,6 +259,10 @@ This will start:
 | `/api/python/strategies/:id` | GET | Get strategy details |
 | `/api/python/strategies/run` | POST | Execute strategy |
 | `/api/python/backtest` | POST | Run advanced backtest |
+| `/api/python/forward/news/signals` | POST | Generate news-based signals |
+| `/api/python/forward/news/signals` | GET | Get latest news signals |
+| `/api/python/forward/news/results` | GET | Get forward test results |
+| `/api/python/forward/news/simulate` | POST | Simulate news-based trades |
 
 ## 📊 UI Components
 
@@ -286,6 +316,50 @@ Trend following strategy using MACD crossovers.
 - `fast_period` (default: 12)
 - `slow_period` (default: 26)
 - `signal_period` (default: 9)
+
+#### 4. Morning Momentum (`morning_momentum`) 🆕
+Gap up strategy with RSI and volume filters for intraday trading.
+
+**Parameters:**
+- `gap_threshold` (default: 2.0) - Minimum gap percentage
+- `rsi_period` (default: 5)
+- `rsi_max` (default: 70)
+- `volume_ratio_min` (default: 2.0)
+
+#### 5. Opening Range Breakout (`opening_range_breakout`) 🆕
+Trades breakouts from the first 30-minute range.
+
+**Parameters:**
+- `range_period` (default: 30) - Opening range period in bars
+- `stop_loss_pct` (default: 1.5)
+- `take_profit_pct` (default: 3.0)
+
+#### 6. VWAP Mean Reversion (`vwap_reversion`) 🆕
+Mean reversion around VWAP in trending markets.
+
+**Parameters:**
+- `ema_fast` (default: 20)
+- `ema_slow` (default: 50)
+- `vwap_deviation_pct` (default: 0.5)
+
+#### 7. Mean Reversion Intraday (`mean_reversion_intraday`) 🆕
+RSI-based oversold bounce strategy.
+
+**Parameters:**
+- `rsi_period` (default: 5)
+- `rsi_oversold` (default: 25)
+- `rsi_target` (default: 50)
+
+#### 8. Sector Momentum (`sector_momentum`) 🆕
+Trades leading stocks in trending sectors.
+
+**Parameters:**
+- `rsi_period` (default: 14)
+- `rsi_min` (default: 50)
+- `rsi_max` (default: 75)
+- `volume_surge_threshold` (default: 2.0)
+
+> 📖 For detailed strategy documentation, see [INTRADAY_STRATEGIES.md](python_backend/INTRADAY_STRATEGIES.md)
 
 ## 📊 Technical Indicators (Python Backend)
 
@@ -394,6 +468,13 @@ POST /api/backtest
 - [ ] More sophisticated strategy parameters
 - [ ] Historical trade journal
 - [ ] Notification system for trade alerts
+
+## 📚 Additional Documentation
+
+- **[INTRADAY_STRATEGIES.md](python_backend/INTRADAY_STRATEGIES.md)** - Detailed guide to intraday trading strategies
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and data flow diagrams
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Complete implementation overview
+- **[strategy_demo.ipynb](python_backend/strategy_demo.ipynb)** - Interactive Jupyter notebook with examples
 
 ## 📄 License
 
