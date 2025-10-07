@@ -3,12 +3,22 @@ from .base import BaseStrategy, Signal, Trade
 from .sma_crossover import SMACrossoverStrategy
 from .rsi_mean_revert import RSIMeanReversionStrategy
 from .macd_trend_follow import MACDTrendFollowStrategy
+from .morning_momentum import MorningMomentumStrategy
+from .opening_range_breakout import OpeningRangeBreakoutStrategy
+from .vwap_reversion import VWAPReversionStrategy
+from .mean_reversion_intraday import MeanReversionIntradayStrategy
+from .sector_momentum import SectorMomentumStrategy
 
 # Strategy registry
 STRATEGIES = {
     'sma_crossover': SMACrossoverStrategy,
     'rsi_mean_revert': RSIMeanReversionStrategy,
     'macd_trend_follow': MACDTrendFollowStrategy,
+    'morning_momentum': MorningMomentumStrategy,
+    'opening_range_breakout': OpeningRangeBreakoutStrategy,
+    'vwap_reversion': VWAPReversionStrategy,
+    'mean_reversion_intraday': MeanReversionIntradayStrategy,
+    'sector_momentum': SectorMomentumStrategy,
 }
 
 
@@ -59,6 +69,11 @@ __all__ = [
     'SMACrossoverStrategy',
     'RSIMeanReversionStrategy',
     'MACDTrendFollowStrategy',
+    'MorningMomentumStrategy',
+    'OpeningRangeBreakoutStrategy',
+    'VWAPReversionStrategy',
+    'MeanReversionIntradayStrategy',
+    'SectorMomentumStrategy',
     'get_strategy',
     'list_strategies',
     'STRATEGIES',

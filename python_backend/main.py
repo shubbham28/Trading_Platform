@@ -4,7 +4,7 @@ Python backend for trading platform with strategy execution and backtesting
 """
 import os
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,6 +15,7 @@ from strategies import get_strategy, list_strategies, STRATEGIES
 from indicators import calculate_all_indicators
 from app.backtest import BacktestEngine, BacktestConfig, BacktestResult
 from app.data_fetcher import DataFetcher
+from news_forward_tester import NewsForwardTester, NewsSignal, ForwardTestResult
 
 # Load environment variables
 load_dotenv()
@@ -37,6 +38,9 @@ app.add_middleware(
 
 # Initialize data fetcher
 data_fetcher = DataFetcher()
+
+# Initialize news forward tester
+news_tester = NewsForwardTester()
 
 
 # Request/Response Models
@@ -68,6 +72,20 @@ class IndicatorsRequest(BaseModel):
     start_date: str
     end_date: str
     timeframe: str = "1Day"
+
+
+class NewsItem(BaseModel):
+    """News item for sentiment analysis"""
+    symbol: str
+    headline: str
+    timestamp: Optional[str] = None
+
+
+class NewsSignalsRequest(BaseModel):
+    """Request for generating news-based signals"""
+    news_items: List[NewsItem]
+    symbols: Optional[List[str]] = None
+    top_n: int = 5
 
 
 # API Routes
@@ -281,6 +299,115 @@ async def run_backtest(request: BacktestRequest) -> BacktestResult:
     
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/forward/news/signals")
+async def generate_news_signals(request: NewsSignalsRequest):
+    """Generate trading signals based on news sentiment"""
+    try:
+        # Convert request news items to dict format
+        news_data = [item.model_dump() for item in request.news_items]
+        
+        # Optionally fetch market data for volume analysis
+        market_data = {}
+        if request.symbols:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            
+            for symbol in request.symbols:
+                try:
+                    df = data_fetcher.get_bars(symbol, start_date, end_date, "1Day")
+                    if not df.empty:
+                        market_data[symbol] = df
+                except Exception as e:
+                    print(f"Could not fetch data for {symbol}: {e}")
+        
+        # Generate signals
+        signals = news_tester.generate_signals(news_data, market_data, request.top_n)
+        
+        # Save signals
+        news_tester.save_signals(signals)
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "total_signals": len(signals),
+            "signals": [s.model_dump() for s in signals]
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/forward/news/signals")
+async def get_latest_news_signals(date: Optional[str] = None):
+    """Get latest news-based trading signals"""
+    try:
+        signals = news_tester.load_signals(date)
+        
+        if signals is None:
+            raise HTTPException(status_code=404, detail="No signals found for the specified date")
+        
+        return {
+            "date": date or datetime.now().strftime('%Y-%m-%d'),
+            "total_signals": len(signals),
+            "signals": [s.model_dump() for s in signals]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/forward/news/results")
+async def get_forward_test_results():
+    """Get latest forward test results"""
+    try:
+        result = news_tester.get_latest_results()
+        
+        if result is None:
+            raise HTTPException(status_code=404, detail="No forward test results found")
+        
+        return result.model_dump()
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/forward/news/simulate")
+async def simulate_forward_test(request: NewsSignalsRequest):
+    """Simulate forward test based on news signals"""
+    try:
+        # Generate signals first
+        news_data = [item.model_dump() for item in request.news_items]
+        
+        # Fetch market data
+        market_data = {}
+        symbols = request.symbols or list(set(item.symbol for item in request.news_items))
+        
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        for symbol in symbols:
+            try:
+                df = data_fetcher.get_bars(symbol, start_date, end_date, "1Day")
+                if not df.empty:
+                    market_data[symbol] = df
+            except Exception as e:
+                print(f"Could not fetch data for {symbol}: {e}")
+        
+        # Generate signals
+        signals = news_tester.generate_signals(news_data, market_data, request.top_n)
+        
+        # Simulate forward test
+        result = news_tester.simulate_forward_test(signals, market_data)
+        
+        return result.model_dump()
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
