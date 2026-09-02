@@ -5,8 +5,13 @@ pandas==2.2.0
 numpy==1.26.4
 pydantic==2.6.1
 sqlalchemy==2.0.27
-alembic==1.13.1
+# 1.13.1 reports spurious drift for `alembic check` on SQLite: it cannot
+# reflect Identity, so every bigint identity primary key looks like a
+# server-default change. Later versions compare correctly.
+alembic==1.19.1
 fastapi==0.110.0
+# main.py calls load_dotenv() at import, so the test suite needs it too.
+python-dotenv==1.0.1
 httpx==0.26.0
 pyyaml==6.0.1
 pytest==8.1.1

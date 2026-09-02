@@ -7,7 +7,10 @@ alpaca-py==0.21.0
 pydantic==2.6.1
 python-dotenv==1.0.1
 sqlalchemy==2.0.27
-alembic==1.13.1
+# 1.13.1 reports spurious drift for `alembic check` on SQLite: it cannot
+# reflect Identity, so every bigint identity primary key looks like a
+# server-default change. Later versions compare correctly.
+alembic==1.19.1
 # psycopg 3, matching the postgresql+psycopg URL in db/session.py
 psycopg[binary]==3.1.18
 # SQLite driver, used by the test suite so it needs no Postgres server
