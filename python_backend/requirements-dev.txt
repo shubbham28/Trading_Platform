@@ -1,0 +1,14 @@
+# Test dependencies. Deliberately excludes torch/transformers: nothing in the
+# suite touches FinBERT, and pulling ~2GB of wheels to run a one-minute suite
+# makes it a suite people stop running.
+pandas==2.2.0
+numpy==1.26.4
+pydantic==2.6.1
+sqlalchemy==2.0.27
+alembic==1.13.1
+fastapi==0.110.0
+httpx==0.26.0
+pyyaml==6.0.1
+pytest==8.1.1
+# No psycopg: the suite runs on SQLite so it needs no Postgres server. That is
+# also its main limitation -- see TODOS.md.

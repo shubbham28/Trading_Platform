@@ -1,5 +1,5 @@
 """Strategies module"""
-from .base import BaseStrategy, Signal, Trade
+from .base import BarContext, BaseStrategy, Position, Signal, Trade
 from .sma_crossover import SMACrossoverStrategy
 from .rsi_mean_revert import RSIMeanReversionStrategy
 from .macd_trend_follow import MACDTrendFollowStrategy
@@ -57,13 +57,17 @@ def list_strategies() -> list:
             'id': strategy_id,
             'name': instance.name,
             'description': instance.description,
-            'parameters': instance.parameters,
+            # The resolved defaults, not the empty dict it was constructed with.
+            # A UI shown `{}` gives the operator nothing to start from.
+            'parameters': instance.default_parameters(),
         })
     return strategies
 
 
 __all__ = [
     'BaseStrategy',
+    'BarContext',
+    'Position',
     'Signal',
     'Trade',
     'SMACrossoverStrategy',

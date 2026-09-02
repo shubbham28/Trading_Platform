@@ -8,6 +8,7 @@ import ordersRouter from './routes/orders';
 import strategiesRouter from './routes/strategies';
 import backtestRouter from './routes/backtest';
 import pythonBackendRouter from './routes/python-backend';
+import engineRouter from './routes/engine';
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +47,9 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/strategies', strategiesRouter);
 app.use('/api/backtest', backtestRouter);
 app.use('/api/python', pythonBackendRouter);
+// Bots, risk, audit and reconciliation are the engine's own routes, forwarded
+// verbatim so their shape is defined in one place.
+app.use('/api', engineRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

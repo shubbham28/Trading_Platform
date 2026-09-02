@@ -12,6 +12,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Without a healthcheck, dependants start as soon as the container exists,
+    # which is before Postgres accepts connections. The migration would then
+    # fail on a race rather than on anything real.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d trading_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - trading-network
 
@@ -25,6 +33,24 @@ services:
     networks:
       - trading-network
 
+  # Migrations run as their own one-shot service rather than inside the backend's
+  # startup. A failed migration then stops the stack visibly instead of leaving a
+  # backend running against a schema it does not match.
+  migrate:
+    build:
+      context: ./python_backend
+      dockerfile: Dockerfile
+    container_name: trading-platform-migrate
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/trading_platform
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trading-network
+    restart: "no"
+
   python-backend:
     build:
       context: ./python_backend
@@ -32,8 +58,14 @@ services:
     container_name: trading-platform-python
     environment:
       - TRADING_MODE=paper
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/trading_platform
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - trading-network
     env_file:
@@ -44,22 +76,17 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: trading-platform-server
+    # Node is a thin BFF now: auth, session and proxying. It holds no database
+    # credentials because it does not touch the database -- the Python engine
+    # owns persistence. Handing it credentials it never uses is surface area for
+    # no benefit.
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=trading_platform
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - PYTHON_BACKEND_URL=http://python-backend:8000
     ports:
       - "3001:3001"
     depends_on:
-      - postgres
-      - redis
       - python-backend
     networks:
       - trading-network
