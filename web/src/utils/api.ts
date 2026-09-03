@@ -10,6 +10,17 @@ import type {
   BacktestResult,
   OrderRequest,
   BacktestRequest,
+  Bot,
+  BotCreateRequest,
+  BotUpdateRequest,
+  KillSwitch,
+  RiskRules,
+  RiskDecision,
+  AuditEntry,
+  Reconciliation,
+  BacktestRunSummary,
+  LiveSettings,
+  ApprovalQueue,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -110,7 +121,11 @@ export const cancelAllOrders = async (): Promise<{ message: string }> => {
 // Strategies
 export const getStrategies = async (): Promise<Strategy[]> => {
   const response = await api.get('/strategies');
-  return response.data;
+  // The engine wraps the list. This read `response.data` while Node served a
+  // bare array from its own registry; repointing the route to Python in Phase 2
+  // changed the shape and the cast hid it, so the strategy dropdown had been
+  // empty ever since.
+  return response.data.strategies ?? response.data;
 };
 
 export const getStrategy = async (strategyId: string): Promise<Strategy> => {
@@ -125,3 +140,140 @@ export const runBacktest = async (request: BacktestRequest): Promise<BacktestRes
 };
 
 export default api;
+
+// -- bots -------------------------------------------------------------------
+
+export const getBots = async (enabledOnly = false): Promise<Bot[]> => {
+  const response = await api.get('/bots', { params: { enabled_only: enabledOnly } });
+  return response.data.bots;
+};
+
+export const getBot = async (botId: number): Promise<Bot> => {
+  const response = await api.get(`/bots/${botId}`);
+  return response.data;
+};
+
+export const createBot = async (request: BotCreateRequest): Promise<Bot> => {
+  const response = await api.post('/bots', request);
+  return response.data;
+};
+
+export const updateBot = async (
+  botId: number,
+  request: BotUpdateRequest
+): Promise<Bot> => {
+  const response = await api.patch(`/bots/${botId}`, request);
+  return response.data;
+};
+
+export const cloneBot = async (
+  botId: number,
+  name: string,
+  parameters?: Record<string, any>
+): Promise<Bot> => {
+  const response = await api.post(`/bots/${botId}/clone`, { name, parameters });
+  return response.data;
+};
+
+export const deleteBot = async (botId: number): Promise<void> => {
+  await api.delete(`/bots/${botId}`);
+};
+
+// -- risk -------------------------------------------------------------------
+
+export const getKillSwitch = async (): Promise<KillSwitch> => {
+  const response = await api.get('/risk/kill-switch');
+  return response.data;
+};
+
+export const setKillSwitch = async (
+  engaged: boolean,
+  reason?: string
+): Promise<KillSwitch> => {
+  const response = await api.post('/risk/kill-switch', { engaged, reason });
+  return response.data;
+};
+
+export const getRiskRules = async (): Promise<RiskRules> => {
+  const response = await api.get('/risk/rules');
+  return response.data;
+};
+
+export const getRiskDecisions = async (
+  botId?: number,
+  limit = 100
+): Promise<RiskDecision[]> => {
+  const response = await api.get('/risk/decisions', {
+    params: { bot_id: botId, limit },
+  });
+  return response.data.decisions;
+};
+
+// -- audit ------------------------------------------------------------------
+
+export const getAudit = async (
+  filters: { botId?: number; eventType?: string; limit?: number } = {}
+): Promise<AuditEntry[]> => {
+  const response = await api.get('/audit', {
+    params: {
+      bot_id: filters.botId,
+      event_type: filters.eventType,
+      limit: filters.limit ?? 200,
+    },
+  });
+  return response.data.entries;
+};
+
+// -- reconciliation ---------------------------------------------------------
+
+export const getReconciliation = async (): Promise<Reconciliation> => {
+  const response = await api.get('/reconciliation');
+  return response.data;
+};
+
+// -- stored backtests -------------------------------------------------------
+
+export const getBacktestRuns = async (
+  filters: { strategyId?: string; symbol?: string; limit?: number } = {}
+): Promise<BacktestRunSummary[]> => {
+  const response = await api.get('/backtest/runs', {
+    params: {
+      strategy_id: filters.strategyId,
+      symbol: filters.symbol,
+      limit: filters.limit ?? 50,
+    },
+  });
+  return response.data.runs;
+};
+
+// -- live gating ------------------------------------------------------------
+
+export const getLiveSettings = async (): Promise<LiveSettings> => {
+  const response = await api.get('/live/settings');
+  return response.data;
+};
+
+export const updateLiveSettings = async (changes: {
+  auto_approve?: boolean;
+  max_order_value?: number;
+  approval_timeout_seconds?: number;
+  note?: string;
+}): Promise<LiveSettings> => {
+  const response = await api.post('/live/settings', changes);
+  return response.data;
+};
+
+export const getApprovals = async (): Promise<ApprovalQueue> => {
+  const response = await api.get('/approvals');
+  return response.data;
+};
+
+export const approveOrder = async (orderId: number, note?: string) => {
+  const response = await api.post(`/approvals/${orderId}/approve`, { note });
+  return response.data;
+};
+
+export const rejectOrder = async (orderId: number, note?: string) => {
+  const response = await api.post(`/approvals/${orderId}/reject`, { note });
+  return response.data;
+};

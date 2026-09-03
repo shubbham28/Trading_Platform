@@ -90,11 +90,14 @@ def calculate_bollinger_bands(
 
 def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     """
-    Calculate Volume Weighted Average Price
-    
+    Calculate Volume Weighted Average Price, accumulating from the first row.
+
+    Correct only when `df` covers exactly one trading session. For a multi-day
+    intraday series use `calculate_session_vwap`, which resets at each bell.
+
     Args:
         df: DataFrame with columns: high, low, close, volume
-    
+
     Returns:
         VWAP as pandas Series
     """
@@ -183,8 +186,12 @@ def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     result['bb_middle'] = middle
     result['bb_lower'] = lower
     
-    # VWAP (if volume exists)
-    if 'volume' in df.columns:
+    # VWAP (if volume exists). Session-reset, not cumulative: on a multi-day
+    # intraday frame a cumulative VWAP is a multi-day average, which is not the
+    # line any trader or venue is quoting.
+    if 'volume' in df.columns and 'timestamp' in df.columns:
+        result['vwap'] = calculate_session_vwap(df)
+    elif 'volume' in df.columns:
         result['vwap'] = calculate_vwap(df)
     
     # ATR
@@ -196,3 +203,37 @@ def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     result['stoch_d'] = d
     
     return result
+
+
+def calculate_session_vwap(df: pd.DataFrame, tz: str = "America/New_York") -> pd.Series:
+    """Calculate VWAP, resetting at the start of each trading session.
+
+    `calculate_vwap` accumulates from the first row it is given, which is only
+    VWAP when that row is the session's open. Fed a multi-day intraday series it
+    returns a multi-day cumulative average that no trader is watching and no
+    venue reports -- so a strategy comparing price against it is comparing
+    against nothing. Real VWAP starts fresh at every bell.
+
+    Args:
+        df: DataFrame with high, low, close, volume and a timestamp column
+        tz: exchange timezone used to decide where one session ends
+
+    Returns:
+        VWAP as a Series aligned to df's index.
+    """
+    if 'timestamp' not in df.columns:
+        raise ValueError("calculate_session_vwap needs a 'timestamp' column")
+
+    ts = pd.to_datetime(df['timestamp'])
+    local = ts.dt.tz_convert(tz) if ts.dt.tz is not None else ts
+    session = local.dt.date
+
+    typical_price = (df['high'] + df['low'] + df['close']) / 3
+    notional = typical_price * df['volume']
+
+    # cumsum within a session group only ever looks backwards, so this stays
+    # causal: the value at bar i is identical whether or not later bars exist.
+    cum_notional = notional.groupby(session).cumsum()
+    cum_volume = df['volume'].groupby(session).cumsum()
+
+    return cum_notional / cum_volume.replace(0, np.nan)

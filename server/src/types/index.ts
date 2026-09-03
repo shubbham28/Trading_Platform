@@ -106,56 +106,10 @@ export interface Account {
   daytrade_count: number;
 }
 
-export interface Strategy {
-  id: string;
-  name: string;
-  description: string;
-  parameters: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-}
 
-export interface BacktestResult {
-  strategy_id: string;
-  symbol: string;
-  start_date: string;
-  end_date: string;
-  initial_capital: number;
-  final_capital: number;
-  total_return: number;
-  total_return_pct: number;
-  sharpe_ratio: number;
-  max_drawdown: number;
-  total_trades: number;
-  winning_trades: number;
-  losing_trades: number;
-  win_rate: number;
-  trades: Trade[];
-  equity_curve: EquityPoint[];
-}
 
-export interface Trade {
-  timestamp: string;
-  action: 'buy' | 'sell';
-  symbol: string;
-  quantity: number;
-  price: number;
-  value: number;
-  reason?: string;
-}
 
-export interface EquityPoint {
-  timestamp: string;
-  equity: number;
-  drawdown: number;
-}
 
-export interface StrategySignal {
-  timestamp: string;
-  action: 'buy' | 'sell' | 'hold';
-  confidence: number;
-  reason: string;
-}
 
 export interface OrderRequest {
   symbol: string;

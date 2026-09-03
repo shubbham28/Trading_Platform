@@ -208,4 +208,29 @@ class AlpacaClient {
   }
 }
 
-export default new AlpacaClient();
+let instance: AlpacaClient | null = null;
+
+/**
+ * The Alpaca client, constructed on first use.
+ *
+ * It used to be built at module scope, which meant the whole server refused to
+ * start without Alpaca credentials -- taking the bots UI, the audit log, the
+ * risk gate and the kill switch down with it, none of which touch Alpaca. A
+ * process that cannot start cannot tell you why, and the kill switch is the
+ * last thing that should be unreachable when something is wrong.
+ *
+ * A proxy rather than changing every call site: the credential error now
+ * surfaces as a failure on the route that actually needs Alpaca, which is where
+ * it belongs.
+ */
+const lazyClient = new Proxy({} as AlpacaClient, {
+  get(_target, property) {
+    if (instance === null) {
+      instance = new AlpacaClient();
+    }
+    const value = (instance as any)[property];
+    return typeof value === 'function' ? value.bind(instance) : value;
+  },
+});
+
+export default lazyClient;

@@ -1,186 +1,135 @@
 """
 Mean Reversion Intraday Strategy
-Enter long when RSI(5) < 25 and no negative news
-Target small reversal before end of day
-"""
-from typing import Dict, Any, Optional
-import pandas as pd
-import numpy as np
+Buy an oversold RSI reading confirmed by price at the lower Bollinger band
+Exit on RSI recovery, target, stop, or the session close
 
-from .base import BaseStrategy, Signal
-from indicators.technical import calculate_rsi, calculate_bollinger_bands
+The Bollinger confirmation is now an actual entry filter. Previously it only
+adjusted the confidence score while the entry fired regardless, so the strategy
+took every oversold reading despite documenting otherwise. Set
+`require_bb_confirmation=False` to get the old, unfiltered behaviour explicitly.
+"""
+from typing import Any, Dict, Optional
+
+import pandas as pd
+
+from indicators.technical import calculate_bollinger_bands, calculate_rsi
+from .base import BarContext, BaseStrategy, Position, Signal
 
 
 class MeanReversionIntradayStrategy(BaseStrategy):
     """Mean Reversion Intraday Strategy"""
-    
+
     def _initialize(self):
-        """Initialize strategy parameters"""
         self.rsi_period = self.parameters.get('rsi_period', 5)
         self.rsi_oversold = self.parameters.get('rsi_oversold', 25)
         self.rsi_target = self.parameters.get('rsi_target', 50)
         self.bb_period = self.parameters.get('bb_period', 20)
         self.bb_std = self.parameters.get('bb_std', 2.0)
+        self.bb_tolerance_pct = self.parameters.get('bb_tolerance_pct', 1.0)
+        self.require_bb_confirmation = self.parameters.get(
+            'require_bb_confirmation', True
+        )
         self.take_profit_pct = self.parameters.get('take_profit_pct', 2.0)
         self.stop_loss_pct = self.parameters.get('stop_loss_pct', 1.5)
-        self.description = f"Mean Reversion Intraday (RSI{self.rsi_period}<{self.rsi_oversold})"
-        
-        # Track position state
-        self.position_open = False
-        self.entry_price: Optional[float] = None
-    
-    def analyze(self, df: pd.DataFrame, index: int) -> Signal:
-        """
-        Analyze data and generate signal based on mean reversion
-        
-        Args:
-            df: DataFrame with OHLCV data
-            index: Current bar index
-        
-        Returns:
-            Trading signal
-        """
-        # Need enough data for calculations
-        if index < max(self.rsi_period + 1, self.bb_period):
-            return Signal(
-                timestamp=df.iloc[index]['timestamp'],
-                action='hold',
-                confidence=0.0,
-                reason='Insufficient data for calculations',
-                price=df.iloc[index]['close']
-            )
-        
-        bar = df.iloc[index]
-        
-        # Calculate RSI
-        rsi = calculate_rsi(df['close'], self.rsi_period)
-        current_rsi = rsi.iloc[index]
-        
-        # Calculate Bollinger Bands for additional confirmation
-        bb_upper, bb_middle, bb_lower = calculate_bollinger_bands(
+        self.description = (
+            f"Mean Reversion Intraday (RSI{self.rsi_period}<{self.rsi_oversold})"
+        )
+
+    def warmup_bars(self) -> int:
+        return max(self.rsi_period + 2, self.bb_period + 1)
+
+    def prepare(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df['_rsi'] = calculate_rsi(df['close'], self.rsi_period)
+        upper, middle, lower = calculate_bollinger_bands(
             df['close'], self.bb_period, self.bb_std
         )
-        current_bb_lower = bb_lower.iloc[index]
-        current_bb_middle = bb_middle.iloc[index]
-        
-        # Check if near end of day
-        is_closing_period = index >= len(df) - 3
-        
-        # Entry Logic: Oversold RSI and price near lower Bollinger Band
-        if not self.position_open:
-            # Check if RSI is oversold
-            if current_rsi < self.rsi_oversold:
-                # Additional confirmation: price near lower BB
-                near_lower_bb = bar['close'] <= current_bb_lower * 1.01
-                
-                self.position_open = True
-                self.entry_price = bar['close']
-                
-                # Confidence based on how oversold
-                confidence = min(
-                    0.5 + ((self.rsi_oversold - current_rsi) / self.rsi_oversold) * 0.5,
-                    1.0
-                )
-                
-                if near_lower_bb:
-                    confidence = min(confidence + 0.2, 1.0)
-                
+        df['_bb_lower'] = lower
+        df['_bb_middle'] = middle
+        return df
+
+    def analyze(
+        self,
+        window: pd.DataFrame,
+        ctx: BarContext,
+        position: Optional[Position],
+    ) -> Signal:
+        now = window.iloc[-1]
+        close = float(now['close'])
+        rsi = now['_rsi']
+
+        if pd.isna(rsi) or pd.isna(now['_bb_lower']):
+            return self.hold(window, ctx, 'Insufficient data for calculations')
+
+        if position is not None:
+            pnl_pct = position.unrealized_pct(close)
+
+            if rsi >= self.rsi_target:
                 return Signal(
-                    timestamp=bar['timestamp'],
-                    action='buy',
-                    confidence=confidence,
-                    reason=f'Oversold signal: RSI={current_rsi:.1f}, near BB lower',
-                    price=bar['close']
+                    timestamp=ctx.timestamp, action='sell', confidence=0.8,
+                    reason=f'RSI recovered to {rsi:.1f}: {pnl_pct:.2f}%',
+                    price=close,
                 )
-        
-        # Exit Logic: RSI recovery, take-profit, stop-loss, or end of day
-        if self.position_open and self.entry_price is not None:
-            pnl_pct = ((bar['close'] - self.entry_price) / self.entry_price) * 100
-            
-            # Mean reversion: RSI recovers to target level
-            if current_rsi >= self.rsi_target:
-                self.position_open = False
-                self.entry_price = None
+            if pnl_pct >= self.take_profit_pct:
                 return Signal(
-                    timestamp=bar['timestamp'],
-                    action='sell',
-                    confidence=0.8,
-                    reason=f'RSI reversion: RSI={current_rsi:.1f}, PnL={pnl_pct:.2f}%',
-                    price=bar['close']
+                    timestamp=ctx.timestamp, action='sell', confidence=0.9,
+                    reason=f'Take-profit hit: {pnl_pct:.2f}%', price=close,
                 )
-            
-            # Price back to BB middle
-            if bar['close'] >= current_bb_middle:
-                self.position_open = False
-                self.entry_price = None
+            if pnl_pct <= -self.stop_loss_pct:
                 return Signal(
-                    timestamp=bar['timestamp'],
-                    action='sell',
-                    confidence=0.8,
-                    reason=f'BB mean reversion: PnL={pnl_pct:.2f}%',
-                    price=bar['close']
+                    timestamp=ctx.timestamp, action='sell', confidence=0.9,
+                    reason=f'Stop-loss hit: {pnl_pct:.2f}%', price=close,
                 )
-            
-            # Take-profit
-            take_profit_price = self.entry_price * (1 + self.take_profit_pct / 100)
-            if bar['close'] >= take_profit_price:
-                self.position_open = False
-                self.entry_price = None
+            if ctx.is_session_last_bar:
                 return Signal(
-                    timestamp=bar['timestamp'],
-                    action='sell',
-                    confidence=0.9,
-                    reason=f'Take-profit hit: {pnl_pct:.2f}%',
-                    price=bar['close']
+                    timestamp=ctx.timestamp, action='sell', confidence=0.7,
+                    reason=f'Flat by session close: {pnl_pct:.2f}%', price=close,
                 )
-            
-            # Stop-loss
-            stop_loss_price = self.entry_price * (1 - self.stop_loss_pct / 100)
-            if bar['close'] <= stop_loss_price:
-                self.position_open = False
-                self.entry_price = None
-                return Signal(
-                    timestamp=bar['timestamp'],
-                    action='sell',
-                    confidence=0.9,
-                    reason=f'Stop-loss hit: {pnl_pct:.2f}%',
-                    price=bar['close']
-                )
-            
-            # End of day
-            if is_closing_period:
-                self.position_open = False
-                self.entry_price = None
-                return Signal(
-                    timestamp=bar['timestamp'],
-                    action='sell',
-                    confidence=0.8,
-                    reason=f'End of day exit: {pnl_pct:.2f}%',
-                    price=bar['close']
-                )
-        
-        return Signal(
-            timestamp=bar['timestamp'],
-            action='hold',
-            confidence=0.0,
-            reason=f'Monitoring: RSI={current_rsi:.1f}',
-            price=bar['close']
+            return self.hold(window, ctx, f'Holding: {pnl_pct:.2f}%')
+
+        if ctx.is_session_last_bar:
+            return self.hold(window, ctx, 'Session closing, no new entries')
+
+        if rsi >= self.rsi_oversold:
+            return self.hold(window, ctx, f'RSI not oversold: {rsi:.1f}')
+
+        bb_limit = float(now['_bb_lower']) * (1 + self.bb_tolerance_pct / 100)
+        near_lower_bb = close <= bb_limit
+        if self.require_bb_confirmation and not near_lower_bb:
+            return self.hold(
+                window, ctx,
+                f'Oversold RSI {rsi:.1f} but price above lower band',
+            )
+
+        confidence = min(
+            0.5 + ((self.rsi_oversold - rsi) / self.rsi_oversold) * 0.5, 1.0
         )
-    
+        if near_lower_bb:
+            confidence = min(confidence + 0.2, 1.0)
+
+        return Signal(
+            timestamp=ctx.timestamp,
+            action='buy',
+            confidence=float(confidence),
+            reason=(
+                f'Oversold signal: RSI={rsi:.1f}'
+                + (', at lower band' if near_lower_bb else '')
+            ),
+            price=close,
+        )
+
     @staticmethod
     def validate_parameters(parameters: Dict[str, Any]) -> bool:
-        """Validate strategy parameters"""
         rsi_period = parameters.get('rsi_period', 5)
         rsi_oversold = parameters.get('rsi_oversold', 25)
         rsi_target = parameters.get('rsi_target', 50)
-        
+        bb_period = parameters.get('bb_period', 20)
+
         if rsi_period < 2:
             raise ValueError("RSI period must be at least 2")
-        if rsi_oversold < 0 or rsi_oversold > 100:
-            raise ValueError("RSI oversold must be between 0 and 100")
-        if rsi_target < 0 or rsi_target > 100:
-            raise ValueError("RSI target must be between 0 and 100")
         if rsi_oversold >= rsi_target:
             raise ValueError("RSI oversold must be less than RSI target")
-        
+        if bb_period < 2:
+            raise ValueError("Bollinger period must be at least 2")
+
         return True
